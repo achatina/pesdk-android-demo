@@ -21,6 +21,8 @@ import ly.img.android.pesdk.backend.model.EditorSDKResult
 import ly.img.android.pesdk.backend.model.constant.OutputMode
 import ly.img.android.pesdk.backend.model.state.LoadSettings
 import ly.img.android.pesdk.backend.model.state.PhotoEditorSaveSettings
+import ly.img.android.pesdk.backend.model.state.layer.ImageStickerLayerSettings
+import ly.img.android.pesdk.backend.model.state.manager.StateHandler
 import ly.img.android.pesdk.ui.activity.PhotoEditorBuilder
 import ly.img.android.pesdk.ui.model.state.UiConfigFilter
 import ly.img.android.pesdk.ui.model.state.UiConfigFrame
@@ -28,6 +30,7 @@ import ly.img.android.pesdk.ui.model.state.UiConfigOverlay
 import ly.img.android.pesdk.ui.model.state.UiConfigSticker
 import ly.img.android.pesdk.ui.model.state.UiConfigText
 import ly.img.android.pesdk.ui.panels.item.PersonalStickerAddItem
+import ly.img.android.serializer._3.IMGLYFileReader
 import ly.img.android.serializer._3.IMGLYFileWriter
 import java.io.File
 import java.io.IOException
@@ -37,6 +40,13 @@ class KEditorDemoActivity : Activity() {
     companion object {
         const val PESDK_RESULT = 1
         const val GALLERY_RESULT = 2
+    }
+
+    private val cacheFile by lazy {
+        File(
+            cacheDir,
+            "serialisationReadyToReadWithPESDKFileReader.json"
+        )
     }
 
     // Create a empty new SettingsList and apply the changes on this reference.
@@ -97,8 +107,24 @@ class KEditorDemoActivity : Activity() {
     fun openEditor(inputImage: Uri?) {
         val settingsList = createPesdkSettingsList()
 
+        StateHandler.replaceStateClass(
+            ImageStickerLayerSettings::class.java,
+            CustomStickerLayerSetting::class.java
+        )
+
         settingsList.configure<LoadSettings> {
             it.source = inputImage
+        }
+
+        if (cacheFile.exists()) {
+            val reader = IMGLYFileReader(settingsList)
+            try {
+                reader.readJson(cacheFile)
+            } catch (e: IOException) {
+                Toast.makeText(this, "Error while opening json.", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
+                return
+            }
         }
 
         PhotoEditorBuilder(this)
@@ -132,10 +158,7 @@ class KEditorDemoActivity : Activity() {
             // OPTIONAL: read the latest state to save it as a serialisation
             val lastState = data.settingsList
             try {
-                IMGLYFileWriter(lastState).writeJson(File(
-                    Environment.getExternalStorageDirectory(),
-                    "serialisationReadyToReadWithPESDKFileReader.json"
-                ))
+                IMGLYFileWriter(lastState).writeJson(cacheFile)
             } catch (e: IOException) {
                 e.printStackTrace()
             }
